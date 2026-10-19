@@ -1,17 +1,51 @@
-from fastapi import FastAPI
+# Import FastAPI tools
+from fastapi import FastAPI, UploadFile, File, HTTPException
 
+# Import the PDF reader
+from pypdf import PdfReader
+
+# Import tools for reading the PDF from memory
+import io
+
+# Create the FastAPI application
 app = FastAPI(
-    title = 'AI Job Hunter',
-    description = 'An AI-powered job hunting application that helps users find suitable job opportunities based on their skills and preferences.',
-    version = '1.0.0',
+    title="AI Job Hunter",
+    description="An AI-powered job discovery and career assistant",
+    version="0.1.0",
 )
 
+# Upload a resume and extract its text
+@app.post("/upload-resume",tags=["Resume"])
+async def upload_resume(file: UploadFile = File(...)):
 
-@app.get("/")
-def home():
-    return {"message": "Welcome to the AI Job Hunter API!",
-            "status": "Running"}
+    # Check whether the uploaded file is a PDF
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a PDF file.",
+        )
 
-@app.get("/health")
-def health_check():
-    return {"status": "Healthy"}
+    # Read the uploaded file
+    contents = await file.read()
+
+    try:
+        # Open the PDF from memory
+        reader = PdfReader(io.BytesIO(contents))
+
+        # Extract text from every page
+        resume_text = ""
+
+        for page in reader.pages:
+            resume_text += page.extract_text() or ""
+
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read the PDF file.",
+        )
+
+    # Return the extracted text
+    return {
+        "filename": file.filename,
+        "resume_text": resume_text,
+    }
